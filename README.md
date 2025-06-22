@@ -1,3 +1,3 @@
-# imbestatdragonchess
-An app created to excel at dragon chess.
- test
+# I'm best at Dragon Chess
+
+Do you want to beat your friends at Dragon Chess? Use this!

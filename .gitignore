@@ -1,1 +1,4 @@
 venv/
+/.direnv/
+/.venv/
+/__pycache__/
