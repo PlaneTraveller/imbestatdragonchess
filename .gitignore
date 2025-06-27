@@ -4,3 +4,6 @@ test/
 /.direnv/
 /.venv/
 /__pycache__/
+flake.lock
+flake.nix
+.envrc

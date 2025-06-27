@@ -1,8 +1,10 @@
+import random
 import numpy as np
 import colored
 from colored import stylize
 from typing import Optional
-
+from functools import partial as pt
+from locale_grid import Screen_interact
 
 from enum import Enum
 class State(Enum):
@@ -14,6 +16,29 @@ class State(Enum):
     VS = 5
     UNKNOWN=10
 
+
+def get_triplets(coord, rows=8, cols=8):
+    x, y = coord[0], coord[1]
+    triplets = []
+
+    # Horizontal triplets (left/right)
+    if y - 2 >= 0:  # Left triplet: [ (x, y-2), (x, y-1), (x, y) ]
+        triplets.append([(x, y - 2), (x, y - 1), (x, y)])
+    if y - 1 >= 0 and y + 1 < cols:  # Middle horizontal: [ (x, y-1), (x, y), (x, y+1) ]
+        triplets.append([(x, y - 1), (x, y), (x, y + 1)])
+    if y + 2 < cols:  # Right triplet: [ (x, y), (x, y+1), (x, y+2) ]
+        triplets.append([(x, y), (x, y + 1), (x, y + 2)])
+
+    # Vertical triplets (up/down)
+    if x - 2 >= 0:  # Above triplet: [ (x-2, y), (x-1, y), (x, y) ]
+        triplets.append([(x - 2, y), (x - 1, y), (x, y)])
+    if x - 1 >= 0 and x + 1 < rows:  # Middle vertical: [ (x-1, y), (x, y), (x+1, y) ]
+        triplets.append([(x - 1, y), (x, y), (x + 1, y)])
+    if x + 2 < rows:  # Below triplet: [ (x, y), (x+1, y), (x+2, y) ]
+        triplets.append([(x, y), (x + 1, y), (x + 2, y)])
+
+    return triplets
+
 class Grid:
     """
     The grid class for the dragon chess.
@@ -22,7 +47,7 @@ class Grid:
         self.height = height
         self.width = width
         self.grid = np.zeros((height, width), dtype=int)
-        self.mouse = None
+        self.sc = Screen_interact()
     def _show(self, show_line_number = True):
         # show the grid of current gamestate.
         return_str = "\n"
@@ -62,40 +87,65 @@ class Grid:
         # total 6 kinds of tiles
         self.grid = np.random.randint(0, 5 + 1, size=(self.height, self.width))
 
+    def is_match(self, swap):
+        # swap is a tuple of (coord, coord)
+        # return true if it's a valid swap
+        tmp_grid = self.grid.copy()
+        tmp_grid[swap[0]], tmp_grid[swap[1]] = tmp_grid[swap[1]], tmp_grid[swap[0]].copy()
+    
+        coord1, coord2 = swap[0], swap[1]
+        triplets = get_triplets(coord1) + get_triplets(coord2)
+    
+        for triplet in triplets:
+            a, b, c = triplet
+            if tmp_grid[a] == tmp_grid[b] == tmp_grid[c]:
+                return True
 
+        return False
 
+    def get_possible_swaps(self):
+        possible_swaps = []
+    
+        for i in range(self.height):
+            for j in range(self.width):
+                # Right neighbor
+                if j < self.width - 1:
+                    possible_swaps.append(((i, j), (i, j + 1)))
+                # Bottom neighbor
+                if i < self.height - 1:
+                    possible_swaps.append(((i, j), (i + 1, j)))
+
+        return possible_swaps
+
+    def get_swaps(self):
+        # Return all possible swap locations for self.grid (only consider down and right swaps)
+        # 7 * 8 * 2 possible swaps, see if any swap result in a match
+        possible_swaps = self.get_possible_swaps()
+        return list(filter(pt(self.is_match), possible_swaps))
+
+    def step(self):
+        screen = self.sc.step()
+        self.grid = screen
+        self._show()
+        possible_swaps = self.get_swaps()
+        possible_swaps.reverse()
+        s = [possible_swaps[0]]
+        for i in possible_swaps:
+            if abs(i[0][1] - s[0][0][1]) > 4:
+                s.append(i)
+        for m in s[:2]:
+            self.sc.move(m[0][0], m[0][1], m[1][0], m[1][1])
+        # s = possible_swaps[-1]
+        # self.sc.move(s[0][0], s[0][1], s[1][0], s[1][1])
 
 if __name__ == "__main__":
-    # grid = Grid()
-    # grid.init_randomly()
-    # grid._show()
+    grid = Grid()
+    grid.init_randomly()
+    grid._show()
+    # grid.grid[(1, 1)] = 1
+    # grid.grid[(2, 1)] = 1
+    # grid.grid[(3, 1)] = 1
+    # grid.grid[(3, 2)] = 1
+    print(grid.grid)
 
-    import cv2
-    import numpy as np
-    from matplotlib import pyplot as plt
-    
-    img_rgb = cv2.imread("./test/test_screen.png")
-    assert img_rgb is not None, "file could not be read, check with os.path.exists()"
-    img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_BGR2GRAY)
-    templates_filename = [
-        "./templates/ice_dragon.png",
-        "./templates/lich.png",
-        "./templates/lina.png",
-        "./templates/dawn.png",
-        "./templates/spider.png",
-        "./templates/vs.png",
-    ]
-    templates = [ cv2.imread(t_name, cv2.IMREAD_GRAYSCALE) for t_name in templates_filename ]
-    
-    for i in range(len(templates)):
-        img_temp = np.copy(img_rgb)
-        w, h = templates[i].shape[::-1]
-        res = cv2.matchTemplate(img_gray,templates[i],cv2.TM_CCOEFF_NORMED)
-        print(res.min(), res.max())
-        # breakpoint()
-        threshold = 0.5
-        loc = np.where( res >= threshold)
-        for pt in zip(*loc[::-1]):
-            cv2.rectangle(img_temp, pt, (pt[0] + w, pt[1] + h), (0,0,255), 2)
-
-        cv2.imwrite(f"./test/res_{i}.png",img_temp)
+    print(list(get_swaps(grid.grid)))

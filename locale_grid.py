@@ -10,8 +10,6 @@ import colored
 from colored import stylize
 from typing import Optional
 
-from game import State, Grid
-
 def canny(image: np.array):
     original_image_for_drawing = image.copy()
     img_h, img_w = image.shape[:2]
@@ -367,7 +365,7 @@ class Screen_interact():
 
     def scan_all(self, current_screen, bins = 32, offset = 15):
         screen = np.zeros((self.y_box_num, self.x_box_num), dtype=int)
-        screen[:,:] = State["UNKNOWN"].value
+        screen[:,:] = 10 #State["UNKNOWN"].value
 
         for idx_y in range(self.y_box_num):
             for idx_x in range(self.x_box_num):
@@ -399,7 +397,7 @@ class Screen_interact():
         ])
 
         screen = np.zeros((self.y_box_num, self.x_box_num))
-        screen[:,:] = State["UNKNOWN"].value
+        screen[:,:] = 10 #State["UNKNOWN"].value
 
         for idx_y in range(self.y_box_num):
             for idx_x in range(self.x_box_num):
@@ -531,9 +529,6 @@ class Screen_interact():
         hists_r, hists_g, hists_b, color_directions = get_template_hists()
         screen = self.scan_all(current_screen)
 
-        grid = Grid()
-        grid.grid = screen
-        grid._show()
 
         self.calibrate_center(edges, coarse_grid = screen)
         breakpoint()
@@ -558,13 +553,24 @@ class Screen_interact():
         self.template_all()
         hists_r, hists_g, hists_b, color_directions = get_template_hists(bins=32, offset=25)
         screen = self.scan_all(current_screen, bins=32, offset=25)
-        grid.grid = screen
-        grid._show()
 
+    # Mouse Part
+    def move(self, idx_y_start, idx_x_start, idx_y_end, idx_x_end):
+        center_from = self.get_box_center(idx_y_start, idx_x_start)
+        center_to   = self.get_box_center(idx_y_end, idx_x_end)
+        pa.moveTo(center_from[1], center_from[0], 0.2) # (y, x) -> (x, y)
+        pa.mouseDown(); 
+        pa.moveTo(center_to[1], center_to[0], 0.2)
+        pa.mouseUp()
+
+    def step(self):
+        current_screen = np.array(pa.screenshot())
+        edges = canny(current_screen)
+        screen = self.scan_all(current_screen)
+        return screen
 
 if __name__ == '__main__':
     sc = Screen_interact()
-    grid = Grid()
     current_screen = np.array(pa.screenshot())
     edges = canny(current_screen)
     screen = sc.scan_all(current_screen)
@@ -573,7 +579,4 @@ if __name__ == '__main__':
         current_screen = np.array(pa.screenshot())
         edges = canny(current_screen)
         screen = sc.scan_all(current_screen)
-        grid.grid = screen
-        grid._show()
         time.sleep(1)
-    # sc.bootstrap()
